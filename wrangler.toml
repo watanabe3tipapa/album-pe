@@ -1,0 +1,14 @@
+name = "album-pe"
+compatibility_date = "2026-07-27"
+pages_build_output_dir = "./dist"
+
+# Cloudflare D1 (SQLite) データベース
+[[d1_databases]]
+binding = "DB"
+database_name = "album-pe-db"
+database_id = ""
+
+# Cloudflare R2 画像ストレージ
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "album-pe-images"

@@ -1,11 +1,62 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Album PE">
+  <main>
+    <h1>Album PE</h1>
+    <p>Private image album sharing</p>
+
+    <section id="albums">
+      <h2>Albums</h2>
+      <div id="album-list"></div>
+      <button id="create-album-btn">+ New Album</button>
+    </section>
+  </main>
 </Layout>
+
+<script>
+  async function loadAlbums() {
+    try {
+      const res = await fetch('/api/albums');
+      if (!res.ok) throw new Error('Failed to load albums');
+      const albums = await res.json();
+      const container = document.getElementById('album-list');
+      if (!container) return;
+      container.innerHTML = albums.map(a => `
+        <div class="album-card" data-id="${a.id}">
+          <h3>${a.title}</h3>
+          <p>${a.description ?? ''}</p>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.album-card').forEach(card => {
+        card.addEventListener('click', () => {
+          window.location.href = `/album/${card.dataset.id}`;
+        });
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('create-album-btn')?.addEventListener('click', async () => {
+    const title = prompt('Album title:');
+    if (!title) return;
+    await fetch('/api/albums', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    await loadAlbums();
+  });
+
+  loadAlbums();
+</script>
+
+<style>
+  main { max-width: 960px; margin: 0 auto; padding: 2rem; }
+  #album-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .album-card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; cursor: pointer; transition: box-shadow 0.2s; }
+  .album-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+</style>
