@@ -1,42 +1,56 @@
-import type { PagesFunction } from '@cloudflare/workers-types';
+import {
+  authenticateRequest,
+  isAuthenticatedUser,
+  isSameOrigin,
+  isUnsafeMethod,
+} from './lib/auth';
 
-interface Env {
-  DB: D1Database;
-  R2_BUCKET: R2Bucket;
+function requiresIdentity(pathname: string): boolean {
+  return pathname === '/albums'
+    || pathname.startsWith('/albums/')
+    || pathname.startsWith('/api/');
 }
 
-export const onRequest: PagesFunction<Env> = async (context) => {
-  const { request } = context;
-  const url = new URL(request.url);
+function addSecurityHeaders(response: Response, isPrivate: boolean): Response {
+  const headers = new Headers(response.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
+  );
 
-  // Cloudflare Access が処理する画面遷移系はスキップ（index, album など）
-  // API エンドポイントのみトークン検証
-  if (url.pathname.startsWith('/api/')) {
-    const accessToken = request.headers.get('CF-Access-Token');
-    if (!accessToken) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-
-    const jwt = accessToken;
-    const parts = jwt.split('.');
-    if (parts.length !== 3) {
-      return new Response('Invalid token', { status: 401 });
-    }
-
-    let payload: Record<string, unknown>;
-    try {
-      payload = JSON.parse(atob(parts[1]));
-    } catch {
-      return new Response('Invalid token', { status: 401 });
-    }
-
-    const email = payload.email as string | undefined;
-    if (!email) {
-      return new Response('Invalid token', { status: 401 });
-    }
-
-    context.data.user = { email, name: payload.name as string ?? email };
+  if (isPrivate) {
+    headers.set('Cache-Control', 'private, no-store');
   }
 
-  return context.next();
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+export const onRequest = async (context: any) => {
+  const { request, env } = context;
+  const pathname = new URL(request.url).pathname;
+  const privateRoute = requiresIdentity(pathname);
+
+  if (!privateRoute) {
+    return addSecurityHeaders(await context.next(), false);
+  }
+
+  if (pathname.startsWith('/api/') && isUnsafeMethod(request.method) && !isSameOrigin(request)) {
+    return addSecurityHeaders(Response.json({ error: 'Cross-site requests are not allowed' }, { status: 403 }), true);
+  }
+
+  const identity = await authenticateRequest(request, env);
+  if (!isAuthenticatedUser(identity)) {
+    return addSecurityHeaders(identity, true);
+  }
+
+  context.data.user = identity;
+  return addSecurityHeaders(await context.next(), true);
 };

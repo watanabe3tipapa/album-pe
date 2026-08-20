@@ -6,7 +6,10 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "album-pe-db"
-database_id = ""
+# Cloudflareで作成したD1の実IDに置き換えてください。
+# ゼロUUIDはローカル開発用のプレースホルダーであり、本番には使用しません。
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "db/migrations"
 
 # Cloudflare R2 画像ストレージ
 [[r2_buckets]]

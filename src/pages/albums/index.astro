@@ -1,0 +1,209 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="あなたのアルバム" description="作成した共有アルバムを管理し、思い出の写真を集めます。">
+  <main id="main-content" class="app-page">
+    <div class="shell">
+      <section class="app-intro">
+        <div>
+          <p class="eyebrow">YOUR SHARED SPACE</p>
+          <h1>あなたのアルバム</h1>
+          <p>アルバムを作り、参加者を招待して、写真を集めましょう。</p>
+        </div>
+        <button class="button" id="open-create" type="button">新しいアルバム <span aria-hidden="true">＋</span></button>
+      </section>
+
+      <div id="album-status" class="status" role="status" aria-live="polite"></div>
+      <section id="album-list" class="album-grid" aria-label="共有アルバムの一覧" aria-busy="true"></section>
+    </div>
+  </main>
+
+  <dialog id="create-dialog" aria-labelledby="create-title">
+    <form id="create-form" method="dialog">
+      <div class="dialog-heading">
+        <div><p class="eyebrow">NEW ALBUM</p><h2 id="create-title">思い出の居場所をつくる</h2></div>
+        <button class="dialog-close" value="cancel" aria-label="閉じる" type="submit">×</button>
+      </div>
+      <label>アルバム名 <span aria-hidden="true">*</span><input name="title" maxlength="120" required placeholder="例：2026年 夏の家族旅行" autocomplete="off" /></label>
+      <label>説明 <span class="optional">任意</span><textarea name="description" maxlength="1000" rows="4" placeholder="このアルバムに集めたい写真を、ひとこと添えましょう。"></textarea></label>
+      <p class="form-note">作成者は、参加者の追加・アルバムの編集・削除を管理できます。</p>
+      <div class="dialog-actions"><button class="button button-secondary" value="cancel" type="submit">キャンセル</button><button class="button" id="create-submit" type="submit" value="default">作成して写真を追加</button></div>
+    </form>
+  </dialog>
+</Layout>
+
+<script>
+  interface Album {
+    id: string;
+    title: string;
+    description: string;
+    image_count: number;
+    cover_image_id: string | null;
+    is_owner: number;
+    permission: string;
+    updated_at: string;
+  }
+
+  const list = document.querySelector<HTMLDivElement>('#album-list')!;
+  const status = document.querySelector<HTMLDivElement>('#album-status')!;
+  const dialog = document.querySelector<HTMLDialogElement>('#create-dialog')!;
+  const form = document.querySelector<HTMLFormElement>('#create-form')!;
+  const openButton = document.querySelector<HTMLButtonElement>('#open-create')!;
+  const submitButton = document.querySelector<HTMLButtonElement>('#create-submit')!;
+
+  function showStatus(message: string, state: 'success' | 'error' | 'info') {
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
+  function clearStatus() {
+    status.textContent = '';
+    delete status.dataset.state;
+  }
+
+  async function getErrorMessage(response: Response): Promise<string> {
+    try {
+      const body = await response.json() as { error?: unknown };
+      if (typeof body.error === 'string') return body.error;
+    } catch { /* Use a safe generic message below. */ }
+    return '処理を完了できませんでした。時間をおいてもう一度お試しください。';
+  }
+
+  function formatDate(value: string) {
+    const date = new Date(value.endsWith('Z') ? value : `${value}Z`);
+    return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
+  }
+
+  function createEmptyState() {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    const icon = document.createElement('span');
+    icon.className = 'empty-icon';
+    icon.textContent = '＋';
+    const heading = document.createElement('h2');
+    heading.textContent = '最初のアルバムをつくりましょう';
+    const text = document.createElement('p');
+    text.textContent = '旅行やイベントの名前を付けて、写真を集める場所を用意します。';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button';
+    button.textContent = 'アルバムを作成する';
+    button.addEventListener('click', () => dialog.showModal());
+    empty.append(icon, heading, text, button);
+    return empty;
+  }
+
+  function createAlbumCard(album: Album) {
+    const link = document.createElement('a');
+    link.className = 'album-card';
+    link.href = `/albums/${album.id}`;
+    link.setAttribute('aria-label', `${album.title}を開く`);
+
+    const cover = document.createElement('div');
+    cover.className = 'album-cover';
+    if (album.cover_image_id) {
+      const image = document.createElement('img');
+      image.src = `/api/image/${album.cover_image_id}`;
+      image.alt = '';
+      image.loading = 'lazy';
+      cover.append(image);
+    } else {
+      const initial = document.createElement('span');
+      initial.textContent = album.title.slice(0, 1) || 'A';
+      cover.append(initial);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'album-card-body';
+    const meta = document.createElement('div');
+    meta.className = 'album-meta';
+    const badge = document.createElement('span');
+    badge.textContent = album.is_owner ? 'あなたが作成' : (album.permission === 'viewer' ? '閲覧のみ' : '参加中');
+    const count = document.createElement('span');
+    count.textContent = `${album.image_count ?? 0} 枚`;
+    meta.append(badge, count);
+    const title = document.createElement('h2');
+    title.textContent = album.title;
+    const description = document.createElement('p');
+    description.textContent = album.description || '写真を追加して、思い出を集めましょう。';
+    const footer = document.createElement('div');
+    footer.className = 'album-card-footer';
+    const updated = document.createElement('span');
+    updated.textContent = album.updated_at ? `${formatDate(album.updated_at)} 更新` : '';
+    const arrow = document.createElement('span');
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '→';
+    footer.append(updated, arrow);
+    body.append(meta, title, description, footer);
+    link.append(cover, body);
+    return link;
+  }
+
+  function renderAlbums(albums: Album[]) {
+    list.replaceChildren();
+    list.setAttribute('aria-busy', 'false');
+    if (albums.length === 0) {
+      list.classList.add('is-empty');
+      list.append(createEmptyState());
+      return;
+    }
+    list.classList.remove('is-empty');
+    albums.forEach((album) => list.append(createAlbumCard(album)));
+  }
+
+  async function loadAlbums() {
+    clearStatus();
+    list.setAttribute('aria-busy', 'true');
+    try {
+      const response = await fetch('/api/albums', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(await getErrorMessage(response));
+      const body = await response.json() as { albums?: Album[] };
+      renderAlbums(Array.isArray(body.albums) ? body.albums : []);
+    } catch (error) {
+      list.replaceChildren();
+      list.setAttribute('aria-busy', 'false');
+      showStatus(error instanceof Error ? error.message : 'アルバムを読み込めませんでした。', 'error');
+    }
+  }
+
+  openButton.addEventListener('click', () => dialog.showModal());
+  dialog.addEventListener('close', () => {
+    form.reset();
+    submitButton.disabled = false;
+    submitButton.textContent = '作成して写真を追加';
+  });
+
+  form.addEventListener('submit', async (event) => {
+    const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
+    if (submitter?.value === 'cancel') return;
+    event.preventDefault();
+
+    const data = new FormData(form);
+    submitButton.disabled = true;
+    submitButton.textContent = '作成中…';
+    try {
+      const response = await fetch('/api/albums', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ title: data.get('title'), description: data.get('description') }),
+      });
+      if (!response.ok) throw new Error(await getErrorMessage(response));
+      const body = await response.json() as { album?: { id?: string } };
+      if (!body.album?.id) throw new Error('アルバムの作成結果を確認できませんでした。');
+      window.location.assign(`/albums/${body.album.id}`);
+    } catch (error) {
+      showStatus(error instanceof Error ? error.message : 'アルバムを作成できませんでした。', 'error');
+      submitButton.disabled = false;
+      submitButton.textContent = '作成して写真を追加';
+    }
+  });
+
+  loadAlbums();
+</script>
+
+<style>
+  .app-page { min-height: calc(100vh - 170px); padding: 56px 0 92px; }.app-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 36px; }.app-intro h1 { margin: 0; font-size: clamp(34px, 5vw, 52px); letter-spacing: -.06em; line-height: 1.1; }.app-intro p:not(.eyebrow) { margin: 12px 0 0; color: var(--ink-soft); line-height: 1.7; }.album-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }.album-grid.is-empty { display: block; }.album-card { display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff; color: inherit; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }.album-card:hover { box-shadow: var(--shadow); transform: translateY(-4px); }.album-cover { display: grid; height: 190px; place-items: center; overflow: hidden; background: linear-gradient(135deg, #e5f2ef, #c7d8ed); color: var(--ink); font-size: 62px; font-weight: 800; }.album-cover img { width: 100%; height: 100%; object-fit: cover; }.album-card-body { padding: 18px; }.album-meta, .album-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: 12px; }.album-meta span:first-child { padding: 4px 7px; border-radius: 99px; background: var(--mint); color: #146257; font-weight: 750; }.album-card h2 { overflow: hidden; margin: 15px 0 8px; font-size: 19px; letter-spacing: -.04em; text-overflow: ellipsis; white-space: nowrap; }.album-card p { display: -webkit-box; min-height: 44px; margin: 0; overflow: hidden; color: var(--ink-soft); font-size: 13px; line-height: 1.7; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }.album-card-footer { margin-top: 20px; }.album-card-footer span:last-child { color: var(--accent); font-size: 18px; }.empty-state { padding: 64px 22px; border: 1px dashed #b9c8d9; border-radius: 18px; background: #fff; text-align: center; }.empty-icon { display: grid; width: 42px; height: 42px; margin: 0 auto 16px; place-items: center; border-radius: 50%; background: var(--mint); color: #146257; font-size: 25px; }.empty-state h2 { margin: 0; font-size: 21px; letter-spacing: -.04em; }.empty-state p { margin: 10px auto 23px; color: var(--ink-soft); font-size: 14px; line-height: 1.7; }
+  dialog { width: min(560px, calc(100% - 28px)); padding: 0; border: 0; border-radius: 18px; box-shadow: 0 28px 80px rgba(16,35,63,.28); }.dialog-heading { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 28px; }.dialog-heading h2 { margin: 0; font-size: 25px; letter-spacing: -.05em; }.dialog-close { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 50%; background: #eff3f7; color: var(--ink); font-size: 24px; }.dialog-close:hover { background: #e0e8f0; }dialog::backdrop { background: rgba(16,35,63,.5); backdrop-filter: blur(3px); }dialog form { padding: 30px; }label { display: grid; gap: 8px; margin-top: 17px; color: var(--ink); font-size: 13px; font-weight: 750; }label span[aria-hidden="true"] { color: var(--accent); }.optional { color: var(--ink-soft); font-weight: 500; }input, textarea { width: 100%; padding: 12px 13px; border: 1px solid #cbd6e2; border-radius: 9px; background: #fff; color: var(--ink); font-size: 15px; font-weight: 500; outline: none; resize: vertical; }input::placeholder, textarea::placeholder { color: #91a0b1; }.form-note { margin: 18px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.6; }.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }.dialog-actions .button { min-height: 42px; font-size: 14px; }.button:disabled { cursor: wait; opacity: .65; transform: none; }
+  @media (max-width: 800px) { .album-grid { grid-template-columns: repeat(2, 1fr); } } @media (max-width: 560px) { .app-page { padding-top: 38px; }.app-intro { align-items: flex-start; flex-direction: column; margin-bottom: 26px; }.album-grid { grid-template-columns: 1fr; }.app-intro .button { width: 100%; }.dialog-actions { flex-direction: column-reverse; }.dialog-actions .button { width: 100%; } }
+</style>
