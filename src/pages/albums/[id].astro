@@ -1,5 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+
+// GitHub Pages向け静的ビルドでは共有アルバム本体を生成しない。
+// Cloudflare PagesのSSRビルドではリクエスト時に表示する。
+export const prerender = import.meta.env.DEPLOY_TARGET === 'github-pages';
+export function getStaticPaths() {
+  return [];
+}
 ---
 
 <Layout title="共有アルバム" description="招待した参加者と写真を集め、思い出を共有するアルバムです。">

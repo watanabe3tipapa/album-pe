@@ -1,3 +1,10 @@
 ---
+// 旧URLはCloudflare SSR環境でのみ新しいアルバム画面へ転送する。
+// GitHub Pagesの静的LPでは個別アルバムを生成しない。
+export const prerender = import.meta.env.DEPLOY_TARGET === 'github-pages';
+export function getStaticPaths() {
+  return [];
+}
+
 return Astro.redirect(`/albums/${encodeURIComponent(Astro.params.id ?? '')}`, 301);
 ---

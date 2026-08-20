@@ -1,5 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
+const base = import.meta.env.BASE_URL;
+const withBase = (path: string) => `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+const albumAppUrl = import.meta.env.PUBLIC_ALBUM_APP_URL || withBase('albums');
 ---
 
 <Layout
@@ -14,14 +18,14 @@ import Layout from '../layouts/Layout.astro';
           <h1>写真を集める場所を、<br /><em>やさしく設計する。</em></h1>
           <p class="hero-lead">Album PEは、共有アルバム用LPのつくり方を学びながら、実際にアルバムを作って写真を集められる場所です。大切な思い出を、招待した人とだけ共有できます。</p>
           <div class="hero-actions">
-            <a class="button" href="/albums">アルバムをはじめる <span aria-hidden="true">→</span></a>
+            <a class="button" href={albumAppUrl}>アルバムをはじめる <span aria-hidden="true">→</span></a>
             <a class="text-link" href="#guide">つくり方を読む <span aria-hidden="true">↓</span></a>
           </div>
           <p class="hero-note"><span aria-hidden="true">●</span> アルバムの閲覧・投稿は認証された参加者だけに公開されます。</p>
         </div>
         <div class="hero-visual" aria-label="共有アルバムのイメージ">
           <div class="visual-card main-photo">
-            <img src="/images/photo-sharing-hero.jpeg" alt="スマートフォンで写真を一緒に見る二人" />
+            <img src={withBase('images/photo-sharing-hero.jpeg')} alt="スマートフォンで写真を一緒に見る二人" />
             <div class="photo-caption"><span>Weekend memories</span><strong>24 photos</strong></div>
           </div>
           <div class="visual-card mini-card mini-top"><span class="mini-icon" aria-hidden="true">+</span><span>みんなの写真を<br />ひとつの場所に</span></div>
@@ -69,7 +73,7 @@ import Layout from '../layouts/Layout.astro';
           <p class="eyebrow">LP BLUEPRINT</p>
           <h2>読む人の気持ちを、<br />使う人の行動へ。</h2>
           <p>Album PEのLPは、価値の提示、つくり方、安心の説明、開始ボタンという流れで設計されています。あなたのサービスでも、この順番を土台にできます。</p>
-          <a class="button button-secondary" href="/albums">実際の体験を開く <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href={albumAppUrl}>実際の体験を開く <span aria-hidden="true">→</span></a>
         </div>
         <ol class="blueprint-list">
           <li><span>01</span><div><strong>共感する情景</strong><p>「写真が散らばっている」という日常の困りごとを、短い言葉と写真で描きます。</p></div></li>
@@ -108,7 +112,7 @@ import Layout from '../layouts/Layout.astro';
         <p class="eyebrow">READY WHEN YOU ARE</p>
         <h2>最初のアルバムから、<br />思い出の共有を始めよう。</h2>
         <p>認証済みの参加者だけがアクセスできる、あなたたちの写真置き場です。</p>
-        <a class="button cta-button" href="/albums">アルバムをはじめる <span aria-hidden="true">→</span></a>
+        <a class="button cta-button" href={albumAppUrl}>アルバムをはじめる <span aria-hidden="true">→</span></a>
       </div>
     </section>
   </main>

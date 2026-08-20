@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:github-pages": "DEPLOY_TARGET=github-pages astro build",
     "preview": "astro preview",
     "check": "astro check",
     "astro": "astro"
