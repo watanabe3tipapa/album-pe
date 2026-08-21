@@ -41,7 +41,7 @@ jobs:
       # Wranglerをリポジトリ直下で実行すると、dist/ に加えて
       # functions/ ディレクトリもCloudflare Pagesへデプロイされる。
       - name: Deploy production
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
